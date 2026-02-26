@@ -27,39 +27,39 @@ const ContactSection = () => {
         { icon: Mail, label: 'Email', value: 'heightsitsolutions@gmail.com' },
         { icon: Phone, label: 'Phone', value: '99664 65050' },
     ];
-    return (<section id="contact" className="py-24 bg-secondary">
+    return (<section id="contact" className="py-12 sm:py-16 bg-secondary">
       <div className="container mx-auto px-4">
-        <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="text-center mb-16">
+        <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="text-center mb-10 sm:mb-16">
           <span className="inline-block px-4 py-2 mb-4 rounded-full bg-accent/10 text-accent text-sm font-medium">
             Get in Touch
           </span>
-          <h2 className="text-4xl md:text-5xl font-serif font-bold text-primary mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-primary mb-4">
             Contact Us
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
             Have a project in mind? We'd love to hear from you.
           </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-6 sm:gap-10 lg:gap-12 max-w-6xl mx-auto">
           {/* Contact Info */}
-          <motion.div initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="space-y-8">
-            <div className="bg-card rounded-3xl p-8 shadow-card">
-              <h3 className="text-2xl font-serif font-bold text-primary mb-6">
+          <motion.div initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="space-y-5 sm:space-y-8">
+            <div className="bg-card rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-card">
+              <h3 className="text-xl sm:text-2xl font-serif font-bold text-primary mb-4 sm:mb-6">
                 Let's Start a Conversation
               </h3>
-              <p className="text-muted-foreground mb-8">
+              <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
                 Whether you have a question about our projects, want to collaborate, or just want to say hello, we're here for you.
               </p>
               
-              <div className="space-y-6">
-                {contactInfo.map((item, index) => (<motion.div key={item.label} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
-                      <item.icon className="w-5 h-5 text-accent"/>
+              <div className="space-y-4 sm:space-y-6">
+                {contactInfo.map((item, index) => (<motion.div key={item.label} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} className="flex items-start gap-3 sm:gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-accent/10 flex items-center justify-center">
+                      <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-accent"/>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">{item.label}</p>
-                      <p className="text-foreground font-medium">{item.value}</p>
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm text-muted-foreground">{item.label}</p>
+                      <p className="text-sm sm:text-base text-foreground font-medium break-words">{item.value}</p>
                     </div>
                   </motion.div>))}
               </div>
@@ -68,7 +68,7 @@ const ContactSection = () => {
 
           {/* Contact Form */}
           <motion.div initial={{ opacity: 0, x: 40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }}>
-            <form onSubmit={handleSubmit} className="bg-card rounded-3xl p-8 shadow-card space-y-6">
+            <form onSubmit={handleSubmit} className="bg-card rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-card space-y-5 sm:space-y-6">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
@@ -95,7 +95,7 @@ const ContactSection = () => {
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Message
                 </label>
-                <Textarea required placeholder="Tell us about your project..." value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="min-h-[150px] rounded-xl resize-none"/>
+                <Textarea required placeholder="Tell us about your project..." value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="min-h-[120px] sm:min-h-[150px] rounded-xl resize-none"/>
               </div>
 
               <Button type="submit" disabled={isSubmitting} className="w-full h-12 rounded-xl text-base accent-gradient text-accent-foreground font-semibold">

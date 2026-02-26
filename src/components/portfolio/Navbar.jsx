@@ -1,17 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ChevronDown, LogOut, Menu, User, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import heightsLogo from '@/assets/heights_logo.png';
+import { toast } from 'sonner';
 const Navbar = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [visitorMobile, setVisitorMobile] = useState(() => localStorage.getItem('portfolio_visitor_mobile') || '');
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const closeMenuTimerRef = useRef(null);
+    const navigate = useNavigate();
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 50);
         };
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+    const handleUserLogin = () => {
+        setIsUserMenuOpen(false);
+        navigate('/user/login');
+    };
+    const handleVisitorLogout = () => {
+        localStorage.removeItem('portfolio_visitor_mobile');
+        window.dispatchEvent(new Event('visitor-mobile-updated'));
+        setIsUserMenuOpen(false);
+        toast.success('User logout successful');
+    };
+    const openUserMenu = () => {
+        if (closeMenuTimerRef.current) {
+            clearTimeout(closeMenuTimerRef.current);
+            closeMenuTimerRef.current = null;
+        }
+        setIsUserMenuOpen(true);
+    };
+    const closeUserMenuWithDelay = () => {
+        if (closeMenuTimerRef.current) {
+            clearTimeout(closeMenuTimerRef.current);
+        }
+        closeMenuTimerRef.current = setTimeout(() => {
+            setIsUserMenuOpen(false);
+        }, 180);
+    };
+    useEffect(() => {
+        const syncVisitorMobile = () => {
+            setVisitorMobile(localStorage.getItem('portfolio_visitor_mobile') || '');
+        };
+        window.addEventListener('visitor-mobile-updated', syncVisitorMobile);
+        window.addEventListener('storage', syncVisitorMobile);
+        return () => {
+            window.removeEventListener('visitor-mobile-updated', syncVisitorMobile);
+            window.removeEventListener('storage', syncVisitorMobile);
+        };
     }, []);
     const navLinks = [
         { label: 'Home', href: '#' },
@@ -44,11 +85,29 @@ const Navbar = () => {
             {navLinks.map((link) => (<button key={link.label} onClick={() => scrollToSection(link.href)} className={`text-sm font-medium transition-colors hover:text-accent ${isScrolled ? 'text-foreground' : 'text-primary-foreground'}`}>
                 {link.label}
               </button>))}
-            <Link to="/user" className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${isScrolled
+            <div className="relative" onMouseEnter={openUserMenu} onMouseLeave={closeUserMenuWithDelay}>
+              <button type="button" className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${isScrolled
             ? 'bg-primary text-primary-foreground hover:shadow-elevated'
             : 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30'}`}>
-              User
-            </Link>
+                <span className="inline-flex items-center gap-2">
+                  <User className="w-4 h-4"/>
+                  {visitorMobile || 'User'}
+                  <ChevronDown className="w-4 h-4 opacity-80"/>
+                </span>
+              </button>
+              {isUserMenuOpen && (<div className="absolute right-0 top-full pt-2 w-44 z-50" onMouseEnter={openUserMenu} onMouseLeave={closeUserMenuWithDelay}>
+                  <div className="rounded-xl border border-border bg-card shadow-elevated p-1">
+                  <button type="button" onClick={handleUserLogin} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
+                    <User className="w-4 h-4"/>
+                    Login as User
+                  </button>
+                  <button type="button" onClick={handleVisitorLogout} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2 text-destructive">
+                    <LogOut className="w-4 h-4"/>
+                    Logout
+                  </button>
+                  </div>
+                </div>)}
+            </div>
           </div>
 
           {/* Mobile Menu Button */}

@@ -4,6 +4,7 @@ import { X, Phone, Lock, CheckCircle, Eye } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+const VISITOR_MOBILE_KEY = 'portfolio_visitor_mobile';
 const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
     const { addInteraction, projects } = usePortfolio();
     const [step, setStep] = useState('phone');
@@ -22,6 +23,10 @@ const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
     const handleVerifyOtp = () => {
         // Mock OTP verification - accept "1234" as valid
         if (otp === '1234' || otp.length === 4) {
+            if (type === 'visit') {
+                localStorage.setItem(VISITOR_MOBILE_KEY, mobile);
+                window.dispatchEvent(new Event('visitor-mobile-updated'));
+            }
             addInteraction(projectId, type, mobile);
             setStep('success');
             if (onSuccess) {
