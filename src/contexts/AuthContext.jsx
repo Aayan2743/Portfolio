@@ -12,6 +12,7 @@ const USER_SESSION_KEY = 'portfolio_user_session';
 export const AuthProvider = ({ children }) => {
     const [adminUser, setAdminUser] = useState(null);
     const [user, setUser] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
     useEffect(() => {
         // Check for existing sessions on mount
         const adminSession = localStorage.getItem(ADMIN_SESSION_KEY);
@@ -32,6 +33,7 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem(USER_SESSION_KEY);
             }
         }
+        setIsAuthReady(true);
     }, []);
     const getMockUsers = () => {
         try {
@@ -119,6 +121,7 @@ export const AuthProvider = ({ children }) => {
     return (<AuthContext.Provider value={{
             adminUser,
             user,
+            isAuthReady,
             isAdminAuthenticated: !!adminUser,
             isUserAuthenticated: !!user,
             adminLogin,
