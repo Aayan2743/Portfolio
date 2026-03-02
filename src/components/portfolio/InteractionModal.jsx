@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Phone, Lock, CheckCircle, Eye } from 'lucide-react';
+import { X, Phone, Lock, CheckCircle, Eye, Loader2 } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import toast from 'react-hot-toast';
+import apiClient from '@/lib/axiosInstance';
+import { setUserAuth } from '@/lib/userAuth';
+
 const VISITOR_MOBILE_KEY = 'portfolio_visitor_mobile';
 const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
     const { addInteraction, projects } = usePortfolio();
@@ -11,33 +15,126 @@ const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
     const [mobile, setMobile] = useState('');
     const [otp, setOtp] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [resendTimer, setResendTimer] = useState(0);
+    
     const project = projects.find(p => p.id === projectId);
-    const handleSendOtp = () => {
-        if (mobile.length < 10) {
-            setError('Please enter a valid mobile number');
+
+    // Timer for resend OTP
+    useEffect(() => {
+        if (resendTimer > 0) {
+            const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [resendTimer]);
+    const handleSendOtp = async () => {
+        // Validate mobile number
+        const cleanMobile = mobile.trim();
+        if (!cleanMobile) {
+            setError('Mobile number is required');
             return;
         }
-        setError('');
-        setStep('otp');
-    };
-    const handleVerifyOtp = () => {
-        // Mock OTP verification - accept "1234" as valid
-        if (otp === '1234' || otp.length === 4) {
-            if (type === 'visit') {
-                localStorage.setItem(VISITOR_MOBILE_KEY, mobile);
-                window.dispatchEvent(new Event('visitor-mobile-updated'));
-            }
-            addInteraction(projectId, type, mobile);
-            setStep('success');
-            if (onSuccess) {
-                setTimeout(() => {
-                    handleClose();
-                    onSuccess();
-                }, 800);
-            }
+        if (cleanMobile.length < 10) {
+            setError('Please enter a valid 10-digit mobile number');
+            return;
         }
-        else {
-            setError('Invalid OTP. Try 1234');
+        if (!/^\d+$/.test(cleanMobile)) {
+            setError('Mobile number should contain only digits');
+            return;
+        }
+
+        setError('');
+        setLoading(true);
+
+        try {
+            const response = await apiClient.post('/auth/send-otp', {
+                identifier: cleanMobile
+            });
+
+            if (response.data.status) {
+                toast.success(response.data.message || 'OTP sent successfully!');
+                setStep('otp');
+                setResendTimer(60); // 60 seconds cooldown
+            } else {
+                setError(response.data.message || 'Failed to send OTP');
+                toast.error(response.data.message || 'Failed to send OTP');
+            }
+        } catch (err) {
+            const errorMessage = err?.response?.data?.message || 'Failed to send OTP. Please try again.';
+            setError(errorMessage);
+            toast.error(errorMessage);
+            
+            // Handle validation errors
+            if (err?.response?.data?.errors) {
+                const validationErrors = Object.values(err.response.data.errors).flat();
+                validationErrors.forEach(msg => toast.error(msg));
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+    const handleVerifyOtp = async () => {
+        // Validate OTP
+        const cleanOtp = otp.trim();
+        if (!cleanOtp) {
+            setError('OTP is required');
+            return;
+        }
+        if (cleanOtp.length < 4) {
+            setError('Please enter a valid OTP');
+            return;
+        }
+
+        setError('');
+        setLoading(true);
+
+        try {
+            const response = await apiClient.post('/auth/verify-login-otp', {
+                identifier: mobile.trim(),
+                otp: cleanOtp
+            });
+
+            if (response.data.status) {
+                toast.success(response.data.message || 'OTP verified successfully!');
+                
+                // Store user token and data using utility function
+                setUserAuth(response.data.token, response.data.user);
+                
+                // Store mobile for visit tracking
+                if (type === 'visit') {
+                    localStorage.setItem(VISITOR_MOBILE_KEY, mobile);
+                    window.dispatchEvent(new Event('visitor-mobile-updated'));
+                }
+
+                // Add interaction tracking
+                addInteraction(projectId, type, mobile);
+                
+                setStep('success');
+                
+                // Redirect after success
+                if (onSuccess) {
+                    setTimeout(() => {
+                        handleClose();
+                        onSuccess();
+                    }, 1500);
+                }
+            } else {
+                const errorMessage = response.data.message || 'Invalid OTP';
+                setError(errorMessage);
+                toast.error(errorMessage);
+            }
+        } catch (err) {
+            const errorMessage = err?.response?.data?.message || 'Invalid OTP. Please try again.';
+            setError(errorMessage);
+            toast.error(errorMessage);
+            
+            // Handle validation errors
+            if (err?.response?.data?.errors) {
+                const validationErrors = Object.values(err.response.data.errors).flat();
+                validationErrors.forEach(msg => toast.error(msg));
+            }
+        } finally {
+            setLoading(false);
         }
     };
     const handleClose = () => {
@@ -45,7 +142,17 @@ const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
         setMobile('');
         setOtp('');
         setError('');
+        setLoading(false);
+        setResendTimer(0);
         onClose();
+    };
+
+    const handleResendOtp = async () => {
+        if (resendTimer > 0) return;
+        
+        setOtp('');
+        setError('');
+        await handleSendOtp();
     };
     const modalVariants = {
         hidden: { opacity: 0, scale: 0.8, y: 50 },
@@ -107,11 +214,15 @@ const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
                       <label className="block text-sm font-medium text-foreground mb-2">
                         Mobile Number
                       </label>
-                      <Input type="tel" placeholder="Enter your mobile number" value={mobile} onChange={(e) => setMobile(e.target.value)} className="h-12 rounded-xl text-lg"/>
+                      <Input type="tel" placeholder="Enter your mobile number" value={mobile} onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setMobile(value);
+                          setError('');
+                        }} maxLength={10} className="h-12 rounded-xl text-lg" disabled={loading}/>
                       {error && (<p className="text-destructive text-sm mt-2">{error}</p>)}
                     </div>
-                    <Button onClick={handleSendOtp} className="w-full h-12 rounded-xl text-base accent-gradient text-accent-foreground font-semibold">
-                      Send OTP
+                    <Button onClick={handleSendOtp} disabled={loading || mobile.length < 10} className="w-full h-12 rounded-xl text-base accent-gradient text-accent-foreground font-semibold">
+                      {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Sending...</>) : 'Send OTP'}
                     </Button>
                   </motion.div>)}
 
@@ -120,18 +231,28 @@ const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
                       Enter the OTP sent to {mobile}
                     </p>
                     <div>
-                      <Input type="text" placeholder="Enter 4-digit OTP" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={4} className="h-14 rounded-xl text-2xl text-center tracking-[0.5em] font-mono"/>
+                      <Input type="text" placeholder="Enter OTP" value={otp} onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setOtp(value);
+                          setError('');
+                        }} maxLength={6} className="h-14 rounded-xl text-2xl text-center tracking-[0.5em] font-mono" disabled={loading} autoFocus/>
                       {error && (<p className="text-destructive text-sm mt-2 text-center">{error}</p>)}
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Hint: Use "1234" for demo
-                      </p>
                     </div>
-                    <Button onClick={handleVerifyOtp} className="w-full h-12 rounded-xl text-base accent-gradient text-accent-foreground font-semibold">
-                      Verify OTP
+                    <Button onClick={handleVerifyOtp} disabled={loading || otp.length < 4} className="w-full h-12 rounded-xl text-base accent-gradient text-accent-foreground font-semibold">
+                      {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin"/>Verifying...</>) : 'Verify OTP'}
                     </Button>
-                    <button onClick={() => setStep('phone')} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      Change mobile number
-                    </button>
+                    <div className="flex items-center justify-between text-sm">
+                      <button onClick={() => {
+                          setStep('phone');
+                          setOtp('');
+                          setError('');
+                        }} className="text-muted-foreground hover:text-foreground transition-colors" disabled={loading}>
+                        Change number
+                      </button>
+                      <button onClick={handleResendOtp} disabled={resendTimer > 0 || loading} className={`transition-colors ${resendTimer > 0 || loading ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:text-primary/80'}`}>
+                        {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                      </button>
+                    </div>
                   </motion.div>)}
 
                 {step === 'success' && (<motion.div key="success" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-4">

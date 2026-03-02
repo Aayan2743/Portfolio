@@ -22,6 +22,7 @@ const mapProjectFromApi = (project) => ({
     title: project.title || '',
     slug: project.slug || '',
     categoryId: String(project.category_id ?? ''),
+    categoryName: project.category?.name || '',
     thumbnail: project.thumbnail_image_url || '',
     gallery: [project.project_image_url, project.thumbnail_image_url].filter(Boolean),
     projectMainHeading: project.main_heading || '',
@@ -37,6 +38,8 @@ const mapProjectFromApi = (project) => ({
     visitCount: Number(project.visit_count ?? 0),
     interestedCount: Number(project.interested_count ?? 0),
     documentedCount: Number(project.documented_count ?? 0),
+    createdAt: project.created_at || '',
+    updatedAt: project.updated_at || '',
 });
 
 const mapCategoriesFromProjects = (projects) => {
@@ -136,11 +139,25 @@ export const PortfolioProvider = ({ children }) => {
             setIsProjectsLoading(true);
             setProjectsError('');
 
-            const response = await apiClient.get('public/projects');
-            const apiProjects = response?.data?.data?.data || [];
+            // Fetch projects and categories in parallel
+            const [projectsResponse, categoriesResponse] = await Promise.all([
+                apiClient.get('public/projects'),
+                apiClient.get('public/categories')
+            ]);
+
+            const apiProjects = projectsResponse?.data?.data?.data || [];
+            const apiCategories = categoriesResponse?.data?.data || [];
 
             setProjects(apiProjects.map(mapProjectFromApi));
-            setCategories(mapCategoriesFromProjects(apiProjects));
+            
+            // Map categories from API
+            const mappedCategories = apiCategories.map(cat => ({
+                id: String(cat.id),
+                name: cat.name || '',
+                slug: cat.slug || '',
+            }));
+            
+            setCategories(mappedCategories);
         }
         catch (error) {
             setProjects([]);

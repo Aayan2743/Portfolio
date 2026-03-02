@@ -69,11 +69,11 @@ const AdminLogin = () => {
           </form>
 
           {/* Demo credentials hint */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-6 p-4 rounded-xl bg-muted">
+          {/* <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-6 p-4 rounded-xl bg-muted">
             <p className="text-sm text-muted-foreground text-center">
               <strong>Admin login uses your backend API credentials.</strong>
             </p>
-          </motion.div>
+          </motion.div> */}
 
           {/* Back to site */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-6 text-center">

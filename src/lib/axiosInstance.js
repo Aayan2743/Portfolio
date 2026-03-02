@@ -21,8 +21,16 @@ apiClient.interceptors.request.use(
       }
     }
 
-    const token = localStorage.getItem("token");
+    // Check for admin token first
+    const adminToken = localStorage.getItem("token");
     const tokenType = localStorage.getItem("token_type") || "Bearer";
+    
+    // Check for user token (portfolio visitor)
+    const userToken = localStorage.getItem("portfolio_user_token");
+    
+    // Prioritize admin token, fallback to user token
+    const token = adminToken || userToken;
+    
     if (token) {
       config.headers.Authorization = `${tokenType} ${token}`;
     }
@@ -35,9 +43,15 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
+      // Clear admin tokens
       localStorage.removeItem("token");
       localStorage.removeItem("token_type");
       localStorage.removeItem("portfolio_admin_session");
+      
+      // Clear user tokens
+      localStorage.removeItem("portfolio_user_token");
+      localStorage.removeItem("portfolio_user_data");
+      
       // window.location.href = "/login";
     }
     return Promise.reject(error);

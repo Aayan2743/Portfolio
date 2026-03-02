@@ -375,6 +375,12 @@ const AdminProfile = () => {
     password: "",
   });
 
+  const [originalData, setOriginalData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
+
   /* ================= FETCH PROFILE ================= */
 
   const fetchProfile = async () => {
@@ -383,14 +389,19 @@ const AdminProfile = () => {
 
       const data = res.data.data;
 
-      setFormData({
+      const profileData = {
         name: data.name || "",
         email: data.email || "",
         phone: String(data.phone ?? ""),
+      };
+
+      setFormData({
+        ...profileData,
         password: "",
       });
 
-      setPreview(data.avatar || "");
+      setOriginalData(profileData);
+      setPreview(data.avatar_url || "");
     } catch (err) {
       toast.error(
         err?.response?.data?.message || "Failed to load profile"
@@ -446,6 +457,18 @@ const AdminProfile = () => {
 
     if (formData.password && formData.password.length < 6)
       return toast.error("Password must be at least 6 characters");
+
+    // Check if any changes were made
+    const hasChanges = 
+      name !== originalData.name ||
+      email !== originalData.email ||
+      phone !== originalData.phone ||
+      formData.password.trim() !== "" ||
+      selectedImage !== null;
+
+    if (!hasChanges) {
+      return toast.error("No changes to save");
+    }
 
     try {
       setLoading(true);

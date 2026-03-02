@@ -4,14 +4,34 @@ import { ChevronDown, LogOut, Menu, User, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import heightsLogo from '@/assets/heights_logo.png';
 import { toast } from 'sonner';
+import { clearUserAuth, getUserData } from '@/lib/userAuth';
 const Navbar = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [visitorMobile, setVisitorMobile] = useState(() => localStorage.getItem('portfolio_visitor_mobile') || '');
+    const [userData, setUserData] = useState(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const closeMenuTimerRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+    
+    // Load user data on mount and when storage changes
+    useEffect(() => {
+        const loadUserData = () => {
+            const user = getUserData();
+            setUserData(user);
+        };
+        
+        loadUserData();
+        
+        // Listen for storage changes
+        window.addEventListener('visitor-mobile-updated', loadUserData);
+        window.addEventListener('storage', loadUserData);
+        
+        return () => {
+            window.removeEventListener('visitor-mobile-updated', loadUserData);
+            window.removeEventListener('storage', loadUserData);
+        };
+    }, []);
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 50);
@@ -24,11 +44,24 @@ const Navbar = () => {
         navigate('/user/login');
     };
     const handleVisitorLogout = () => {
+        // Clear all user-related data from localStorage
+        clearUserAuth();
         localStorage.removeItem('portfolio_visitor_mobile');
-        window.dispatchEvent(new Event('visitor-mobile-updated'));
+        
+        // Update state
+        setUserData(null);
         setIsUserMenuOpen(false);
-        toast.success('User logout successful');
+        
+        // Dispatch event for other components
+        window.dispatchEvent(new Event('visitor-mobile-updated'));
+        
+        // Navigate to home page
+        navigate('/');
+        
+        // Show success message
+        toast.success('Logged out successfully');
     };
+    
     const openUserMenu = () => {
         if (closeMenuTimerRef.current) {
             clearTimeout(closeMenuTimerRef.current);
@@ -44,17 +77,7 @@ const Navbar = () => {
             setIsUserMenuOpen(false);
         }, 180);
     };
-    useEffect(() => {
-        const syncVisitorMobile = () => {
-            setVisitorMobile(localStorage.getItem('portfolio_visitor_mobile') || '');
-        };
-        window.addEventListener('visitor-mobile-updated', syncVisitorMobile);
-        window.addEventListener('storage', syncVisitorMobile);
-        return () => {
-            window.removeEventListener('visitor-mobile-updated', syncVisitorMobile);
-            window.removeEventListener('storage', syncVisitorMobile);
-        };
-    }, []);
+    
     const navLinks = [
         { label: 'Home', href: '#' },
         { label: 'Projects', href: '#projects' },
@@ -96,7 +119,7 @@ const Navbar = () => {
             : 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30'}`}>
                 <span className="inline-flex items-center gap-2">
                   <User className="w-4 h-4"/>
-                  {visitorMobile || 'User'}
+                  {userData?.name || userData?.phone || 'User'}
                   <ChevronDown className="w-4 h-4 opacity-80"/>
                 </span>
               </button>
