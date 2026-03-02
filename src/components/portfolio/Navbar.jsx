@@ -23,13 +23,19 @@ const Navbar = () => {
         
         loadUserData();
         
-        // Listen for storage changes
-        window.addEventListener('visitor-mobile-updated', loadUserData);
-        window.addEventListener('storage', loadUserData);
+        // Listen for storage changes and custom events
+        const handleStorageChange = () => {
+            loadUserData();
+        };
+        
+        window.addEventListener('visitor-mobile-updated', handleStorageChange);
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('user-auth-updated', handleStorageChange);
         
         return () => {
-            window.removeEventListener('visitor-mobile-updated', loadUserData);
-            window.removeEventListener('storage', loadUserData);
+            window.removeEventListener('visitor-mobile-updated', handleStorageChange);
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('user-auth-updated', handleStorageChange);
         };
     }, []);
     useEffect(() => {
@@ -52,8 +58,9 @@ const Navbar = () => {
         setUserData(null);
         setIsUserMenuOpen(false);
         
-        // Dispatch event for other components
+        // Dispatch events for other components
         window.dispatchEvent(new Event('visitor-mobile-updated'));
+        window.dispatchEvent(new Event('user-auth-updated'));
         
         // Navigate to home page
         navigate('/');
@@ -123,16 +130,28 @@ const Navbar = () => {
                   <ChevronDown className="w-4 h-4 opacity-80"/>
                 </span>
               </button>
-              {isUserMenuOpen && (<div className="absolute right-0 top-full pt-2 w-44 z-50" onMouseEnter={openUserMenu} onMouseLeave={closeUserMenuWithDelay}>
+              {isUserMenuOpen && (<div className="absolute right-0 top-full pt-2 w-48 z-50" onMouseEnter={openUserMenu} onMouseLeave={closeUserMenuWithDelay}>
                   <div className="rounded-xl border border-border bg-card shadow-elevated p-1">
-                  <button type="button" onClick={handleUserLogin} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
-                    <User className="w-4 h-4"/>
-                    Login as User
-                  </button>
-                  <button type="button" onClick={handleVisitorLogout} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2 text-destructive">
-                    <LogOut className="w-4 h-4"/>
-                    Logout
-                  </button>
+                  {userData ? (
+                    <>
+                      <button type="button" onClick={() => {
+                        setIsUserMenuOpen(false);
+                        navigate('/user');
+                      }} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
+                        <User className="w-4 h-4"/>
+                        User Dashboard
+                      </button>
+                      <button type="button" onClick={handleVisitorLogout} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2 text-destructive">
+                        <LogOut className="w-4 h-4"/>
+                        Logout
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={handleUserLogin} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
+                      <User className="w-4 h-4"/>
+                      Login as Admin
+                    </button>
+                  )}
                   </div>
                 </div>)}
             </div>
@@ -152,18 +171,31 @@ const Navbar = () => {
               {navLinks.map((link) => (<button key={link.label} onClick={() => scrollToSection(link.href)} className="block w-full text-left text-foreground text-lg font-medium py-2">
                   {link.label}
                 </button>))}
-              <button type="button" onClick={() => {
-            setIsMobileMenuOpen(false);
-            navigate('/user/login');
-        }} className="block w-full text-left text-foreground text-lg font-medium py-2">
-                Login as User
-              </button>
-              <button type="button" onClick={() => {
-            setIsMobileMenuOpen(false);
-            handleVisitorLogout();
-        }} className="block w-full text-left text-destructive text-lg font-medium py-2">
-                Logout
-              </button>
+              
+              {userData ? (
+                <>
+                  <button type="button" onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    navigate('/user');
+                  }} className="block w-full text-left text-foreground text-lg font-medium py-2">
+                    User Dashboard
+                  </button>
+                  <button type="button" onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    handleVisitorLogout();
+                  }} className="block w-full text-left text-destructive text-lg font-medium py-2">
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  navigate('/user/login');
+                }} className="block w-full text-left text-foreground text-lg font-medium py-2">
+                  Login as Admin
+                </button>
+              )}
+              
               <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-center py-3 rounded-xl bg-primary text-primary-foreground font-medium">
                 Admin Panel
               </Link>

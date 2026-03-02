@@ -34,15 +34,37 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem(ADMIN_SESSION_KEY);
             }
         }
-        const userSession = localStorage.getItem(USER_SESSION_KEY);
-        if (userSession) {
+
+        // Check for OTP-authenticated user
+        const userToken = localStorage.getItem('portfolio_user_token');
+        const userData = localStorage.getItem('portfolio_user_data');
+        
+        if (userToken && userData) {
             try {
-                setUser(JSON.parse(userSession));
+                const parsedUser = JSON.parse(userData);
+                setUser(parsedUser);
+                // Also set in USER_SESSION_KEY for compatibility
+                localStorage.setItem(USER_SESSION_KEY, userData);
+                // Dispatch event to notify other components
+                window.dispatchEvent(new Event('user-auth-updated'));
             }
             catch {
-                localStorage.removeItem(USER_SESSION_KEY);
+                localStorage.removeItem('portfolio_user_token');
+                localStorage.removeItem('portfolio_user_data');
+            }
+        } else {
+            // Fallback to old user session
+            const userSession = localStorage.getItem(USER_SESSION_KEY);
+            if (userSession) {
+                try {
+                    setUser(JSON.parse(userSession));
+                }
+                catch {
+                    localStorage.removeItem(USER_SESSION_KEY);
+                }
             }
         }
+        
         setIsAuthReady(true);
     }, []);
     const getMockUsers = () => {
@@ -121,6 +143,10 @@ export const AuthProvider = ({ children }) => {
     const userLogout = () => {
         setUser(null);
         localStorage.removeItem(USER_SESSION_KEY);
+        // Also clear OTP authentication tokens
+        localStorage.removeItem('portfolio_user_token');
+        localStorage.removeItem('portfolio_user_data');
+        localStorage.removeItem('portfolio_visitor_mobile');
     };
     const updateUserProfile = (updates) => {
         if (!user)

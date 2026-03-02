@@ -109,6 +109,9 @@ const InteractionModal = ({ isOpen, type, projectId, onClose, onSuccess }) => {
                 // Add interaction tracking
                 addInteraction(projectId, type, mobile);
                 
+                // Dispatch event to update navbar and other components
+                window.dispatchEvent(new Event('user-auth-updated'));
+                
                 setStep('success');
                 
                 // Redirect after success
