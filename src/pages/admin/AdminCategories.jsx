@@ -1,15 +1,54 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit, Trash2, X, Folder } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import apiClient from '@/lib/axiosInstance';
 import { toast } from 'sonner';
 const AdminCategories = () => {
-    const { categories, projects, addCategory, updateCategory, deleteCategory } = usePortfolio();
+    const { projects } = usePortfolio();
+    const [categories, setCategories] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
     const [formData, setFormData] = useState({ name: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
+
+    const getErrorMessage = (error, fallbackMessage) => {
+        const responseData = error?.response?.data;
+        if (responseData?.message) {
+            return responseData.message;
+        }
+        const validationErrors = responseData?.errors;
+        if (validationErrors && typeof validationErrors === 'object') {
+            const firstErrorGroup = Object.values(validationErrors)[0];
+            if (Array.isArray(firstErrorGroup) && firstErrorGroup.length > 0) {
+                return firstErrorGroup[0];
+            }
+            if (typeof firstErrorGroup === 'string') {
+                return firstErrorGroup;
+            }
+        }
+        if (error?.message) {
+            return error.message;
+        }
+        return fallbackMessage;
+    };
+
+    const fetchCategories = useCallback(async () => {
+        try {
+            const response = await apiClient.get('admin-dashboard/categories');
+            const apiCategories = response?.data?.data?.data || [];
+            setCategories(apiCategories);
+        }
+        catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to load categories'));
+        }
+    }, []);
+    useEffect(() => {
+        fetchCategories();
+    }, [fetchCategories]);
     const openModal = (category) => {
         if (category) {
             setEditingCategory(category);
@@ -21,27 +60,66 @@ const AdminCategories = () => {
         }
         setIsModalOpen(true);
     };
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (editingCategory) {
-            updateCategory(editingCategory.id, formData);
-            toast.success('Category updated successfully');
+        if (isSubmitting)
+            return;
+        const trimmedName = formData.name.trim();
+        if (!trimmedName)
+            return;
+        const payload = { name: trimmedName };
+        try {
+            setIsSubmitting(true);
+            if (editingCategory) {
+                const response = await apiClient.post(`admin-dashboard/categories/${editingCategory.id}`, payload);
+                if (!response?.data?.success) {
+                    throw new Error(response?.data?.message || 'Failed to update category');
+                }
+                toast.success(response?.data?.message || 'Category updated successfully');
+            }
+            else {
+                const response = await apiClient.post('admin-dashboard/categories', payload);
+                if (!response?.data?.success) {
+                    throw new Error(response?.data?.message || 'Failed to create category');
+                }
+                toast.success(response?.data?.message || 'Category created successfully');
+            }
+            await fetchCategories();
+            setIsModalOpen(false);
+            setEditingCategory(null);
+            setFormData({ name: '' });
         }
-        else {
-            addCategory(formData);
-            toast.success('Category created successfully');
+        catch (error) {
+            toast.error(getErrorMessage(error, editingCategory ? 'Failed to update category' : 'Failed to create category'));
         }
-        setIsModalOpen(false);
+        finally {
+            setIsSubmitting(false);
+        }
     };
-    const handleDelete = (id) => {
-        const projectCount = projects.filter(p => p.categoryId === id).length;
+    const handleDelete = async (id) => {
+        if (deletingId)
+            return;
+        const projectCount = projects.filter(p => String(p.categoryId) === String(id)).length;
         if (projectCount > 0) {
             toast.error(`Cannot delete category with ${projectCount} projects`);
             return;
         }
         if (confirm('Are you sure you want to delete this category?')) {
-            deleteCategory(id);
-            toast.success('Category deleted');
+            try {
+                setDeletingId(id);
+                const response = await apiClient.delete(`admin-dashboard/categories/${id}`);
+                if (!response?.data?.success) {
+                    throw new Error(response?.data?.message || 'Failed to delete category');
+                }
+                toast.success(response?.data?.message || 'Category deleted');
+                await fetchCategories();
+            }
+            catch (error) {
+                toast.error(getErrorMessage(error, 'Failed to delete category'));
+            }
+            finally {
+                setDeletingId(null);
+            }
         }
     };
     return (<div className="space-y-8">
@@ -59,7 +137,7 @@ const AdminCategories = () => {
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {categories.map((category, index) => {
-            const projectCount = projects.filter(p => p.categoryId === category.id).length;
+            const projectCount = projects.filter(p => String(p.categoryId) === String(category.id)).length;
             return (<motion.div key={category.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="bg-card rounded-2xl p-6 shadow-card hover-lift">
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">

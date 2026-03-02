@@ -5,7 +5,7 @@ const FloatingActions = () => {
         window.open('tel:+15551234567', '_self');
     };
     const handleWhatsAppClick = () => {
-        window.open('https://wa.me/15551234567?text=Hello! I am interested in your services.', '_blank');
+        window.open('https://wa.me/919966465050?text=Hello! I am interested in your services.', '_blank');
     };
     return (<div className="fixed bottom-5 right-4 sm:bottom-8 sm:right-8 z-40 flex flex-col gap-3 sm:gap-4">
       {/* WhatsApp Button */}

@@ -5,12 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import ProjectCard from './ProjectCard';
 import InteractionModal from './InteractionModal';
 const ProjectsSection = () => {
-    const { projects, categories } = usePortfolio();
+    const { projects, categories, isProjectsLoading, projectsError } = usePortfolio();
     const navigate = useNavigate();
     const [activeCategory, setActiveCategory] = useState(null);
     const [modalState, setModalState] = useState({ isOpen: false, type: 'interested', projectId: '', redirectPath: null });
     const filteredProjects = activeCategory
-        ? projects.filter(p => p.categoryId === activeCategory)
+        ? projects.filter(p => String(p.categoryId) === String(activeCategory))
         : projects;
     const openModal = (projectId, type) => {
         setModalState({
@@ -33,7 +33,6 @@ const ProjectsSection = () => {
             Explore our diverse range of projects across different industries
           </p>
         </motion.div>
-
         {/* Category Tabs */}
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.2 }} className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8 sm:mb-12">
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setActiveCategory(null)} className={`px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 ${activeCategory === null
@@ -41,7 +40,7 @@ const ProjectsSection = () => {
             : 'bg-secondary text-secondary-foreground hover:bg-muted'}`}>
             All Projects
           </motion.button>
-          {categories.map((category) => (<motion.button key={category.id} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setActiveCategory(category.id)} className={`px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 ${activeCategory === category.id
+          {categories.map((category) => (<motion.button key={category.id} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setActiveCategory(category.id)} className={`px-6 py-3 rounded-full text-sm font-medium transition-all duration-300 ${String(activeCategory) === String(category.id)
                 ? 'bg-primary text-primary-foreground shadow-elevated'
                 : 'bg-secondary text-secondary-foreground hover:bg-muted'}`}>
               {category.name}
@@ -51,7 +50,11 @@ const ProjectsSection = () => {
         {/* Projects Grid */}
         <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-7 md:gap-8">
           <AnimatePresence mode="popLayout">
-            {filteredProjects.map((project, index) => (<motion.div key={project.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.4 }}>
+            {isProjectsLoading ? (<motion.div key="projects-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full text-center text-muted-foreground">
+                Loading projects...
+              </motion.div>) : projectsError ? (<motion.div key="projects-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full text-center text-destructive">
+                {projectsError}
+              </motion.div>) : filteredProjects.map((project, index) => (<motion.div key={project.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.4 }}>
                 <ProjectCard project={project} index={index} onVisit={() => openModal(project.id, 'visit')} onInterested={() => openModal(project.id, 'interested')} onDocument={() => openModal(project.id, 'documented')}/>
               </motion.div>))}
           </AnimatePresence>

@@ -12,6 +12,7 @@ const UserLogin = () => {
     const [isAdminMode, setIsAdminMode] = useState(false);
     const [isRegister, setIsRegister] = useState(false);
     const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -26,7 +27,7 @@ const UserLogin = () => {
         setIsLoading(true);
         let success;
         if (isAdminMode) {
-            success = await adminLogin(email, password);
+            success = await adminLogin(username, password);
             if (success) {
                 toast.success('Welcome back, Admin!');
                 navigate(adminFrom, { replace: true });
@@ -106,10 +107,10 @@ const UserLogin = () => {
               </motion.div>)}
 
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
-              <label className="block text-sm font-medium text-foreground mb-2">Email Address</label>
+              <label className="block text-sm font-medium text-foreground mb-2">{isAdminMode ? 'Username' : 'Email Address'}</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground"/>
-                <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="pl-10"/>
+                {isAdminMode ? <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground"/> : <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground"/>}
+                <Input type={isAdminMode ? 'text' : 'email'} required value={isAdminMode ? username : email} onChange={(e) => isAdminMode ? setUsername(e.target.value) : setEmail(e.target.value)} placeholder={isAdminMode ? 'admin' : 'you@example.com'} className="pl-10"/>
               </div>
             </motion.div>
 

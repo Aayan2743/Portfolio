@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, Eye, EyeOff, Shield } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 const AdminLogin = () => {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +18,7 @@ const AdminLogin = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        const success = await adminLogin(email, password);
+        const success = await adminLogin(username, password);
         if (success) {
             toast.success('Welcome back, Admin!');
             navigate(from, { replace: true });
@@ -43,10 +43,10 @@ const AdminLogin = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
-              <label className="block text-sm font-medium text-foreground mb-2">Email Address</label>
+              <label className="block text-sm font-medium text-foreground mb-2">Username</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground"/>
-                <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@portfolio.com" className="pl-10"/>
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground"/>
+                <Input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" className="pl-10"/>
               </div>
             </motion.div>
 
@@ -71,9 +71,7 @@ const AdminLogin = () => {
           {/* Demo credentials hint */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-6 p-4 rounded-xl bg-muted">
             <p className="text-sm text-muted-foreground text-center">
-              <strong>Demo credentials:</strong><br />
-              Email: admin@portfolio.com<br />
-              Password: admin123
+              <strong>Admin login uses your backend API credentials.</strong>
             </p>
           </motion.div>
 

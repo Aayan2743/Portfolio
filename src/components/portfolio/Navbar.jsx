@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, LogOut, Menu, User, X } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import heightsLogo from '@/assets/heights_logo.png';
 import { toast } from 'sonner';
 const Navbar = () => {
@@ -11,6 +11,7 @@ const Navbar = () => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const closeMenuTimerRef = useRef(null);
     const navigate = useNavigate();
+    const location = useLocation();
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 50);
@@ -61,6 +62,10 @@ const Navbar = () => {
     ];
     const scrollToSection = (href) => {
         setIsMobileMenuOpen(false);
+        if (location.pathname !== '/') {
+            navigate(href === '#' ? '/' : `/${href}`);
+            return;
+        }
         if (href === '#') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }

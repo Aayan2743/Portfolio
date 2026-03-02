@@ -1,24 +1,34 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiClient } from '@/lib/utils';
 const AuthContext = createContext(undefined);
-// Mock admin credentials
-const MOCK_ADMIN = {
-    email: 'admin@portfolio.com',
-    password: 'admin123',
-};
 // Mock user database
 const MOCK_USERS_KEY = 'portfolio_users';
 const ADMIN_SESSION_KEY = 'portfolio_admin_session';
 const USER_SESSION_KEY = 'portfolio_user_session';
+const TOKEN_KEY = 'token';
+const TOKEN_TYPE_KEY = 'token_type';
 export const AuthProvider = ({ children }) => {
     const [adminUser, setAdminUser] = useState(null);
     const [user, setUser] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
+    const clearAdminAuth = () => {
+        setAdminUser(null);
+        localStorage.removeItem(ADMIN_SESSION_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(TOKEN_TYPE_KEY);
+    };
     useEffect(() => {
         // Check for existing sessions on mount
         const adminSession = localStorage.getItem(ADMIN_SESSION_KEY);
         if (adminSession) {
             try {
-                setAdminUser(JSON.parse(adminSession));
+                const token = localStorage.getItem(TOKEN_KEY);
+                if (!token) {
+                    localStorage.removeItem(ADMIN_SESSION_KEY);
+                }
+                else {
+                    setAdminUser(JSON.parse(adminSession));
+                }
             }
             catch {
                 localStorage.removeItem(ADMIN_SESSION_KEY);
@@ -47,25 +57,30 @@ export const AuthProvider = ({ children }) => {
     const saveMockUsers = (users) => {
         localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
     };
-    const adminLogin = async (email, password) => {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        if (email === MOCK_ADMIN.email && password === MOCK_ADMIN.password) {
-            const admin = {
-                id: 'admin-1',
-                email: MOCK_ADMIN.email,
-                name: 'Admin User',
-                role: 'admin',
-            };
+    const adminLogin = async (username, password) => {
+        try {
+            const response = await apiClient.post('auth/admin-login', {
+                username,
+                password,
+            });
+            const data = response?.data;
+            if (!data?.success || !data?.token || !data?.user) {
+                return false;
+            }
+            const admin = data.user;
             setAdminUser(admin);
             localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(admin));
+            localStorage.setItem(TOKEN_KEY, data.token);
+            localStorage.setItem(TOKEN_TYPE_KEY, data.token_type || 'Bearer');
             return true;
         }
-        return false;
+        catch {
+            clearAdminAuth();
+            return false;
+        }
     };
     const adminLogout = () => {
-        setAdminUser(null);
-        localStorage.removeItem(ADMIN_SESSION_KEY);
+        clearAdminAuth();
     };
     const userLogin = async (email, password) => {
         await new Promise(resolve => setTimeout(resolve, 500));

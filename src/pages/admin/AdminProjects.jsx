@@ -1,42 +1,147 @@
-import { useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit, Trash2, X, Eye, Heart, FileText, Upload, Image as ImageIcon } from 'lucide-react';
-import { usePortfolio } from '@/contexts/PortfolioContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import apiClient from '@/lib/axiosInstance';
 import { toast } from 'sonner';
+
+const EMPTY_FEATURE = {
+    title: '',
+    description: '',
+    image: '',
+    imagePreview: '',
+    imageFile: null,
+};
+
+const mapProjectFromApi = (project) => ({
+    id: project.id,
+    title: project.title || '',
+    thumbnail: project.thumbnail_image_url || '',
+    projectImageUrl: project.project_image_url || '',
+    projectMainHeading: project.main_heading || '',
+    categoryId: String(project.category_id ?? ''),
+    description: project.description || '',
+    features: Array.isArray(project.features) && project.features.length > 0
+        ? project.features.map(feature => ({
+            id: feature.id,
+            title: feature.title || '',
+            description: feature.description || '',
+            image: feature.image_url || '',
+            imagePreview: feature.image_url || '',
+            imageFile: null,
+        }))
+        : [{ ...EMPTY_FEATURE }],
+    visitCount: 0,
+    interestedCount: 0,
+    documentedCount: 0,
+});
+
+const isApiSuccess = (response) => {
+    const payload = response?.data;
+    if (typeof payload?.status === 'boolean')
+        return payload.status;
+    if (typeof payload?.success === 'boolean')
+        return payload.success;
+    return true;
+};
+
+const getApiMessage = (response, fallbackMessage) => response?.data?.message || fallbackMessage;
+
+const getErrorMessage = (error, fallbackMessage) => {
+    const responseData = error?.response?.data;
+    if (responseData?.message) {
+        return responseData.message;
+    }
+    const validationErrors = responseData?.errors;
+    if (validationErrors && typeof validationErrors === 'object') {
+        const firstErrorGroup = Object.values(validationErrors)[0];
+        if (Array.isArray(firstErrorGroup) && firstErrorGroup.length > 0) {
+            return firstErrorGroup[0];
+        }
+        if (typeof firstErrorGroup === 'string') {
+            return firstErrorGroup;
+        }
+    }
+    if (error?.message) {
+        return error.message;
+    }
+    return fallbackMessage;
+};
+
 const AdminProjects = () => {
-    const { projects, categories, addProject, updateProject, deleteProject } = usePortfolio();
+    const [projects, setProjects] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [deletingProjectId, setDeletingProjectId] = useState(null);
     const [formData, setFormData] = useState({
         title: '',
         thumbnail: '',
         projectMainHeading: '',
         categoryId: '',
         description: '',
-        features: [{ title: '', description: '', image: '' }],
+        features: [{ ...EMPTY_FEATURE }],
     });
-    const [projectImages, setProjectImages] = useState([]);
+    const [projectImageFile, setProjectImageFile] = useState(null);
     const [imagePreviews, setImagePreviews] = useState([]);
+    const [thumbnailFile, setThumbnailFile] = useState(null);
+
     const imagesInputRef = useRef(null);
+    const thumbnailInputRef = useRef(null);
+
+    const fetchCategories = useCallback(async () => {
+        try {
+            const response = await apiClient.get('admin-dashboard/categories');
+            const apiCategories = response?.data?.data?.data || [];
+            setCategories(apiCategories);
+        }
+        catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to load categories'));
+        }
+    }, []);
+
+    const fetchProjects = useCallback(async () => {
+        try {
+            const response = await apiClient.get('admin-dashboard/projects');
+            const apiProjects = response?.data?.data?.data || [];
+            setProjects(apiProjects.map(mapProjectFromApi));
+        }
+        catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to load projects'));
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchCategories();
+        fetchProjects();
+    }, [fetchCategories, fetchProjects]);
+
     const openModal = (project) => {
         if (project) {
             setEditingProject(project);
             setFormData({
                 title: project.title,
-                thumbnail: project.thumbnail,
+                thumbnail: project.thumbnail || '',
                 projectMainHeading: project.projectMainHeading || '',
-                categoryId: project.categoryId,
+                categoryId: String(project.categoryId || ''),
                 description: project.description,
                 features: project.features.length > 0
-                    ? project.features.map(f => ({ ...f, imagePreview: f.image }))
-                    : [{ title: '', description: '', image: '' }],
+                    ? project.features.map(feature => ({
+                        title: feature.title || '',
+                        description: feature.description || '',
+                        image: feature.image || '',
+                        imagePreview: feature.imagePreview || feature.image || '',
+                        imageFile: null,
+                    }))
+                    : [{ ...EMPTY_FEATURE }],
             });
-            setProjectImages(project.gallery || []);
-            setImagePreviews(project.gallery || []);
+            setThumbnailFile(null);
+            setProjectImageFile(null);
+            setImagePreviews(project.projectImageUrl ? [project.projectImageUrl] : []);
         }
         else {
             setEditingProject(null);
@@ -44,53 +149,51 @@ const AdminProjects = () => {
                 title: '',
                 thumbnail: '',
                 projectMainHeading: '',
-                categoryId: categories[0]?.id || '',
+                categoryId: categories[0] ? String(categories[0].id) : '',
                 description: '',
-                features: [{ title: '', description: '', image: '' }],
+                features: [{ ...EMPTY_FEATURE }],
             });
-            setProjectImages([]);
+            setThumbnailFile(null);
+            setProjectImageFile(null);
             setImagePreviews([]);
         }
         setIsModalOpen(true);
     };
+
     const handleImagesUpload = (e) => {
-        const files = Array.from(e.target.files || []);
-        files.forEach(file => {
-            if (file.size > 10 * 1024 * 1024) {
-                toast.error(`${file.name} is too large. Max 10MB per image.`);
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64 = event.target?.result;
-                setProjectImages(prev => [...prev, base64]);
-                setImagePreviews(prev => [...prev, base64]);
-            };
-            reader.readAsDataURL(file);
-        });
+        const file = e.target.files?.[0];
+        if (!file)
+            return;
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('Project image must be under 10MB');
+            return;
+        }
+        setProjectImageFile(file);
+        setImagePreviews([URL.createObjectURL(file)]);
     };
-    const removeImage = (index) => {
-        setProjectImages(prev => prev.filter((_, i) => i !== index));
-        setImagePreviews(prev => prev.filter((_, i) => i !== index));
+
+    const removeImage = () => {
+        setProjectImageFile(null);
+        setImagePreviews([]);
     };
+
     const handleFeatureImageUpload = (index, e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error('Image is too large. Max 5MB.');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64 = event.target?.result;
-                const newFeatures = [...formData.features];
-                newFeatures[index] = { ...newFeatures[index], image: base64, imagePreview: base64 };
-                setFormData({ ...formData, features: newFeatures });
-            };
-            reader.readAsDataURL(file);
+        if (!file)
+            return;
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image is too large. Max 5MB.');
+            return;
         }
+        const newFeatures = [...formData.features];
+        newFeatures[index] = {
+            ...newFeatures[index],
+            imageFile: file,
+            imagePreview: URL.createObjectURL(file),
+        };
+        setFormData({ ...formData, features: newFeatures });
     };
-    const thumbnailInputRef = useRef(null);
+
     const handleThumbnailUpload = (e) => {
         const file = e.target.files?.[0];
         if (!file)
@@ -99,55 +202,171 @@ const AdminProjects = () => {
             toast.error('Thumbnail must be under 5MB');
             return;
         }
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const result = event.target?.result;
-            if (typeof result !== 'string')
-                return;
-            setFormData({
-                ...formData,
-                thumbnail: result,
-            });
-        };
-        reader.readAsDataURL(file);
-    };
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const cleanedFeatures = formData.features
-            .filter(f => f.title.trim() !== '')
-            .map(({ imagePreview, ...rest }) => rest);
-        const projectData = {
+        setThumbnailFile(file);
+        setFormData({
             ...formData,
-            features: cleanedFeatures,
-            gallery: projectImages.length > 0 ? projectImages : undefined,
-        };
-        if (editingProject) {
-            updateProject(editingProject.id, projectData);
-            toast.success('Project updated successfully');
-        }
-        else {
-            addProject(projectData);
-            toast.success('Project created successfully');
-        }
-        setIsModalOpen(false);
+            thumbnail: URL.createObjectURL(file),
+        });
     };
-    const handleDelete = (id) => {
-        if (confirm('Are you sure you want to delete this project?')) {
-            deleteProject(id);
-            toast.success('Project deleted');
+
+    const buildProjectFormData = (isUpdate) => {
+        const payload = new FormData();
+        payload.append('title', formData.title.trim());
+        payload.append('category_id', String(Number(formData.categoryId)));
+        payload.append('main_heading', formData.projectMainHeading.trim());
+        payload.append('description', formData.description.trim());
+
+        if (!isUpdate || thumbnailFile) {
+            if (thumbnailFile) {
+                payload.append('thumbnail_image', thumbnailFile);
+            }
+        }
+
+        if (!isUpdate || projectImageFile) {
+            if (projectImageFile) {
+                payload.append('project_image', projectImageFile);
+            }
+        }
+
+        const cleanedFeatures = formData.features.filter(feature => feature.title.trim() || feature.description.trim() || feature.imageFile);
+        if (cleanedFeatures.length > 0) {
+            cleanedFeatures.forEach((feature, index) => {
+                payload.append(`features[${index}][title]`, feature.title.trim());
+                payload.append(`features[${index}][description]`, feature.description.trim());
+                if (feature.imageFile) {
+                    payload.append(`features[${index}][image]`, feature.imageFile);
+                }
+            });
+        }
+        else if (!isUpdate) {
+            payload.append('features', '[]');
+        }
+
+        return payload;
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (isSubmitting)
+            return;
+
+        if (!formData.title.trim()) {
+            toast.error('Title is required');
+            return;
+        }
+        if (!formData.categoryId) {
+            toast.error('Category is required');
+            return;
+        }
+        if (!formData.projectMainHeading.trim()) {
+            toast.error('Main heading is required');
+            return;
+        }
+        if (!formData.description.trim()) {
+            toast.error('Description is required');
+            return;
+        }
+        if (!editingProject && !thumbnailFile) {
+            toast.error('Thumbnail image is required');
+            return;
+        }
+        if (!editingProject && !projectImageFile) {
+            toast.error('Project image is required');
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            const payload = buildProjectFormData(Boolean(editingProject));
+            let response;
+
+            if (editingProject) {
+                response = await apiClient.post(`admin-dashboard/projects/update/${editingProject.id}`, payload);
+                if (!isApiSuccess(response)) {
+                    throw new Error(getApiMessage(response, 'Failed to update project'));
+                }
+                toast.success(getApiMessage(response, 'Project updated successfully'));
+            }
+            else {
+                response = await apiClient.post('admin-dashboard/projects/store', payload);
+                if (!isApiSuccess(response)) {
+                    throw new Error(getApiMessage(response, 'Failed to create project'));
+                }
+                toast.success(getApiMessage(response, 'Project created successfully'));
+            }
+
+            await fetchProjects();
+            setIsModalOpen(false);
+            setEditingProject(null);
+            setThumbnailFile(null);
+            setProjectImageFile(null);
+            setImagePreviews([]);
+            setFormData({
+                title: '',
+                thumbnail: '',
+                projectMainHeading: '',
+                categoryId: categories[0] ? String(categories[0].id) : '',
+                description: '',
+                features: [{ ...EMPTY_FEATURE }],
+            });
+        }
+        catch (error) {
+            toast.error(getErrorMessage(error, editingProject ? 'Failed to update project' : 'Failed to create project'));
+        }
+        finally {
+            setIsSubmitting(false);
         }
     };
+
+    const handleDelete = async (id) => {
+        if (deletingProjectId)
+            return;
+        if (!confirm('Are you sure you want to delete this project?')) {
+            return;
+        }
+
+        try {
+            setDeletingProjectId(id);
+            let response;
+            try {
+                response = await apiClient.delete(`admin-dashboard/projects/delete/${id}`);
+            }
+            catch (error) {
+                if (error?.response?.status === 405) {
+                    response = await apiClient.post(`admin-dashboard/projects/delete/${id}`);
+                }
+                else {
+                    throw error;
+                }
+            }
+
+            if (!isApiSuccess(response)) {
+                throw new Error(getApiMessage(response, 'Failed to delete project'));
+            }
+            toast.success(getApiMessage(response, 'Project deleted'));
+            await fetchProjects();
+        }
+        catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to delete project'));
+        }
+        finally {
+            setDeletingProjectId(null);
+        }
+    };
+
     const addFeature = () => {
         setFormData({
             ...formData,
-            features: [...formData.features, { title: '', description: '', image: '' }],
+            features: [...formData.features, { ...EMPTY_FEATURE }],
         });
     };
+
     const updateFeature = (index, field, value) => {
         const newFeatures = [...formData.features];
         newFeatures[index] = { ...newFeatures[index], [field]: value };
         setFormData({ ...formData, features: newFeatures });
     };
+
     const removeFeature = (index) => {
         if (formData.features.length > 1) {
             setFormData({
@@ -156,11 +375,13 @@ const AdminProjects = () => {
             });
         }
     };
+
     const removeFeatureImage = (index) => {
         const newFeatures = [...formData.features];
-        newFeatures[index] = { ...newFeatures[index], image: '', imagePreview: '' };
+        newFeatures[index] = { ...newFeatures[index], image: '', imagePreview: '', imageFile: null };
         setFormData({ ...formData, features: newFeatures });
     };
+
     return (<div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
@@ -187,7 +408,7 @@ const AdminProjects = () => {
             </thead>
             <tbody>
               {projects.map((project, index) => {
-            const category = categories.find(c => c.id === project.categoryId);
+            const category = categories.find(c => String(c.id) === String(project.categoryId));
             return (<motion.tr key={project.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className="border-b border-border last:border-0">
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-4">
@@ -207,15 +428,15 @@ const AdminProjects = () => {
                       <div className="flex justify-center gap-4">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Eye className="w-4 h-4"/>
-                          {project.visitCount}
+                          {project.visitCount ?? 0}
                         </div>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Heart className="w-4 h-4"/>
-                          {project.interestedCount}
+                          {project.interestedCount ?? 0}
                         </div>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <FileText className="w-4 h-4"/>
-                          {project.documentedCount}
+                          {project.documentedCount ?? 0}
                         </div>
                       </div>
                     </td>
@@ -263,7 +484,7 @@ const AdminProjects = () => {
                         <SelectValue placeholder="Select category"/>
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (<SelectItem key={category.id} value={category.id}>
+                        {categories.map((category) => (<SelectItem key={category.id} value={String(category.id)}>
                             {category.name}
                           </SelectItem>))}
                       </SelectContent>
@@ -279,7 +500,10 @@ const AdminProjects = () => {
                       <input type="file" accept="image/*" ref={thumbnailInputRef} onChange={handleThumbnailUpload} className="hidden"/>
                       {formData.thumbnail ? (<div className="relative w-full h-32 rounded-xl overflow-hidden border border-border bg-muted">
                           <img src={formData.thumbnail} alt="Thumbnail preview" className="w-full h-full object-cover"/>
-                          <button type="button" onClick={() => setFormData({ ...formData, thumbnail: "" })} className="absolute top-1 right-1 p-1 rounded-full bg-destructive text-destructive-foreground hover:opacity-90">
+                          <button type="button" onClick={() => {
+                    setThumbnailFile(null);
+                    setFormData({ ...formData, thumbnail: '' });
+                }} className="absolute top-1 right-1 p-1 rounded-full bg-destructive text-destructive-foreground hover:opacity-90">
                             <X className="w-3 h-3"/>
                           </button>
                         </div>) : (<button type="button" onClick={() => thumbnailInputRef.current?.click()} className="w-full h-32 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-accent hover:text-accent transition-colors">
@@ -354,8 +578,7 @@ const AdminProjects = () => {
                       </div>))}
                   </div>
                 </div>
-
-                <Button type="submit" className="w-full accent-gradient text-accent-foreground">
+                <Button type="submit" className="w-full accent-gradient text-accent-foreground" disabled={isSubmitting}>
                   {editingProject ? 'Update Project' : 'Create Project'}
                 </Button>
               </form>
