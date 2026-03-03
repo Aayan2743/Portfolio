@@ -133,21 +133,15 @@ const Navbar = () => {
               {isUserMenuOpen && (<div className="absolute right-0 top-full pt-2 w-48 z-50" onMouseEnter={openUserMenu} onMouseLeave={closeUserMenuWithDelay}>
                   <div className="rounded-xl border border-border bg-card shadow-elevated p-1">
                   {userData ? (
-                    <>
-                      <button type="button" onClick={() => {
-                        setIsUserMenuOpen(false);
-                        navigate('/user');
-                      }} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
-                        <User className="w-4 h-4"/>
-                        User Dashboard
-                      </button>
-                      <button type="button" onClick={handleVisitorLogout} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2 text-destructive">
-                        <LogOut className="w-4 h-4"/>
-                        Logout
-                      </button>
-                    </>
+                    <button type="button" onClick={handleVisitorLogout} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2 text-destructive">
+                      <LogOut className="w-4 h-4"/>
+                      Logout
+                    </button>
                   ) : (
-                    <button type="button" onClick={handleUserLogin} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
+                    <button type="button" onClick={() => {
+                      setIsUserMenuOpen(false);
+                      navigate('/admin/login');
+                    }} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2">
                       <User className="w-4 h-4"/>
                       Login as Admin
                     </button>
@@ -173,32 +167,20 @@ const Navbar = () => {
                 </button>))}
               
               {userData ? (
-                <>
-                  <button type="button" onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    navigate('/user');
-                  }} className="block w-full text-left text-foreground text-lg font-medium py-2">
-                    User Dashboard
-                  </button>
-                  <button type="button" onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    handleVisitorLogout();
-                  }} className="block w-full text-left text-destructive text-lg font-medium py-2">
-                    Logout
-                  </button>
-                </>
+                <button type="button" onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleVisitorLogout();
+                }} className="block w-full text-left text-destructive text-lg font-medium py-2">
+                  Logout
+                </button>
               ) : (
                 <button type="button" onClick={() => {
                   setIsMobileMenuOpen(false);
-                  navigate('/user/login');
+                  navigate('/admin/login');
                 }} className="block w-full text-left text-foreground text-lg font-medium py-2">
                   Login as Admin
                 </button>
               )}
-              
-              <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-center py-3 rounded-xl bg-primary text-primary-foreground font-medium">
-                Admin Panel
-              </Link>
             </div>
           </motion.div>)}
       </AnimatePresence>

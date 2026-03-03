@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink, Routes, Route, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Image, Folder, FileCode, Users, Settings, Menu, X, LogOut, Home, } from 'lucide-react';
+import { LayoutDashboard, Image, Folder, FileCode, Users, Settings, Menu, X, LogOut, Home, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminBanners from '@/pages/admin/AdminBanners';
@@ -9,6 +9,7 @@ import AdminCategories from '@/pages/admin/AdminCategories';
 import AdminProjects from '@/pages/admin/AdminProjects';
 import AdminUsers from '@/pages/admin/AdminUsers';
 import AdminProfile from '@/pages/admin/AdminProfile';
+import AdminSettings from '@/pages/admin/AdminSettings';
 const AdminLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const navigate = useNavigate();
@@ -19,11 +20,12 @@ const AdminLayout = () => {
     };
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
-        { icon: Image, label: 'Banners', path: '/admin/banners' },
+        // { icon: Image, label: 'Banners', path: '/admin/banners' },
         { icon: Folder, label: 'Categories', path: '/admin/categories' },
         { icon: FileCode, label: 'Projects', path: '/admin/projects' },
         { icon: Users, label: 'User Data', path: '/admin/users' },
-        { icon: Settings, label: 'Profile', path: '/admin/profile' },
+        { icon: Settings, label: 'Settings', path: '/admin/settings' },
+        { icon: User, label: 'Profile', path: '/admin/profile' },
     ];
     return (<div className="min-h-screen bg-background flex">
       {/* Sidebar */}
@@ -32,7 +34,7 @@ const AdminLayout = () => {
         <div className="p-6 border-b border-border">
           <h1 className="text-2xl font-serif font-bold text-primary">Admin Panel</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {adminUser?.email || 'Portfolio Management'}
+            {adminUser?.name || 'Portfolio Management'}
           </p>
         </div>
 
@@ -77,10 +79,11 @@ const AdminLayout = () => {
         <main className="p-6">
           <Routes>
             <Route index element={<AdminDashboard />}/>
-            <Route path="banners" element={<AdminBanners />}/>
+            {/* <Route path="banners" element={<AdminBanners />}/> */}
             <Route path="categories" element={<AdminCategories />}/>
             <Route path="projects" element={<AdminProjects />}/>
             <Route path="users" element={<AdminUsers />}/>
+            <Route path="settings" element={<AdminSettings />}/>
             <Route path="profile" element={<AdminProfile />}/>
           </Routes>
         </main>

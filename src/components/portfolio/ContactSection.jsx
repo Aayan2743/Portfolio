@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import apiClient from "../../lib/axiosInstance"
 const ContactSection = () => {
     const [formData, setFormData] = useState({
         name: '',
@@ -13,15 +14,82 @@ const ContactSection = () => {
         message: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        // Mock submission
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        toast.success('Message sent successfully! We\'ll get back to you soon.');
-        setFormData({ name: '', email: '', phone: '', message: '' });
-        setIsSubmitting(false);
-    };
+    // const handleSubmit = async (e) => {
+    //     e.preventDefault();
+    //     setIsSubmitting(true);
+    //     // Mock submission
+    //     await new Promise(resolve => setTimeout(resolve, 1000));
+    //     toast.success('Message sent successfully! We\'ll get back to you soon.');
+    //     setFormData({ name: '', email: '', phone: '', message: '' });
+    //     setIsSubmitting(false);
+    // };
+    
+       const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsSubmitting(true);
+
+  try {
+    const response = await apiClient.post(
+      "public/contact/send",
+      formData
+    );
+
+    const { success, errors, message } = response.data;
+
+    // ✅ SUCCESS CASE
+    if (success === true) {
+      toast.success(message || "Message sent successfully!");
+
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        message: "",
+      });
+
+      return;
+    }
+
+    // ❌ BACKEND RETURNED success: false
+    if (success === false) {
+      toast.error(errors || message || "Submission failed.");
+      return;
+    }
+
+  } catch (error) {
+    console.error("Contact API Error:", error);
+
+    // 🔴 Validation / 422 errors
+    if (error.response) {
+      const { data, status } = error.response;
+
+      if (status === 422) {
+        toast.error(
+          data?.errors || data?.message || "Validation error."
+        );
+      } else if (status === 500) {
+        toast.error("Server error. Please try again later.");
+      } else {
+        toast.error(
+          data?.errors ||
+          data?.message ||
+          "Something went wrong. Please try again."
+        );
+      }
+    } 
+    // 🔴 Network error
+    else if (error.request) {
+      toast.error("Network error. Please check your connection.");
+    } 
+    // 🔴 Unknown error
+    else {
+      toast.error("Unexpected error occurred.");
+    }
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+    
     const contactInfo = [
         { icon: MapPin, label: 'Address', value: '5 th floor, Nulife Apartments, BK Guda, Sanjeeva Reddy Nagar, Hyderabad, Telangana 500034' },
         { icon: Mail, label: 'Email', value: 'heightsitsolutions@gmail.com' },

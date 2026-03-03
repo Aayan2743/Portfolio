@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit, Trash2, X, Folder } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Folder, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,10 @@ const AdminCategories = () => {
     const [formData, setFormData] = useState({ name: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(6);
+    const [isLoading, setIsLoading] = useState(false);
 
     const getErrorMessage = (error, fallbackMessage) => {
         const responseData = error?.response?.data;
@@ -38,12 +42,16 @@ const AdminCategories = () => {
 
     const fetchCategories = useCallback(async () => {
         try {
+            setIsLoading(true);
             const response = await apiClient.get('admin-dashboard/categories');
             const apiCategories = response?.data?.data?.data || [];
             setCategories(apiCategories);
         }
         catch (error) {
             toast.error(getErrorMessage(error, 'Failed to load categories'));
+        }
+        finally {
+            setIsLoading(false);
         }
     }, []);
     useEffect(() => {
@@ -122,6 +130,23 @@ const AdminCategories = () => {
             }
         }
     };
+
+    // Filter and paginate categories
+    const filteredCategories = categories.filter(category => {
+        const searchLower = searchQuery.toLowerCase();
+        return category.name.toLowerCase().includes(searchLower);
+    });
+
+    const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentCategories = filteredCategories.slice(startIndex, endIndex);
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
     return (<div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
@@ -134,9 +159,34 @@ const AdminCategories = () => {
         </Button>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search categories..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 h-10"
+        />
+      </div>
+
       {/* Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((category, index) => {
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        </div>
+      ) : currentCategories.length === 0 ? (
+        <div className="bg-card rounded-2xl p-12 text-center">
+          <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            {searchQuery ? 'No categories found matching your search' : 'No categories yet'}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentCategories.map((category, index) => {
             const projectCount = projects.filter(p => String(p.categoryId) === String(category.id)).length;
             return (<motion.div key={category.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="bg-card rounded-2xl p-6 shadow-card hover-lift">
               <div className="flex items-start justify-between mb-4">
@@ -156,7 +206,49 @@ const AdminCategories = () => {
               <p className="text-sm text-muted-foreground">{projectCount} projects</p>
             </motion.div>);
         })}
-      </div>
+          </div>
+
+          {/* Pagination */}
+          {filteredCategories.length > itemsPerPage && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredCategories.length)} of {filteredCategories.length} categories
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className={currentPage === page ? "accent-gradient text-accent-foreground" : ""}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Modal */}
       <AnimatePresence>
@@ -176,8 +268,9 @@ const AdminCategories = () => {
                   <label className="block text-sm font-medium mb-2">Category Name</label>
                   <Input required value={formData.name} onChange={(e) => setFormData({ name: e.target.value })} placeholder="e.g., Web Applications"/>
                 </div>
-                <Button type="submit" className="w-full accent-gradient text-accent-foreground">
-                  {editingCategory ? 'Update Category' : 'Create Category'}
+                <Button type="submit" className="w-full accent-gradient text-accent-foreground" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {isSubmitting ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
                 </Button>
               </form>
             </motion.div>

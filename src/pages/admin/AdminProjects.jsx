@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit, Trash2, X, Eye, Heart, FileText, Upload, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Eye, Heart, FileText, Upload, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,6 +78,10 @@ const AdminProjects = () => {
     const [editingProject, setEditingProject] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingProjectId, setDeletingProjectId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(5);
+    const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         thumbnail: '',
@@ -106,12 +110,16 @@ const AdminProjects = () => {
 
     const fetchProjects = useCallback(async () => {
         try {
+            setIsLoading(true);
             const response = await apiClient.get('admin-dashboard/projects');
             const apiProjects = response?.data?.data?.data || [];
             setProjects(apiProjects.map(mapProjectFromApi));
         }
         catch (error) {
             toast.error(getErrorMessage(error, 'Failed to load projects'));
+        }
+        finally {
+            setIsLoading(false);
         }
     }, []);
 
@@ -382,6 +390,27 @@ const AdminProjects = () => {
         setFormData({ ...formData, features: newFeatures });
     };
 
+    // Filter and paginate projects
+    const filteredProjects = projects.filter(project => {
+        const searchLower = searchQuery.toLowerCase();
+        const category = categories.find(c => String(c.id) === String(project.categoryId));
+        return (
+            project.title.toLowerCase().includes(searchLower) ||
+            project.description.toLowerCase().includes(searchLower) ||
+            category?.name.toLowerCase().includes(searchLower)
+        );
+    });
+
+    const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentProjects = filteredProjects.slice(startIndex, endIndex);
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
     return (<div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
@@ -394,20 +423,44 @@ const AdminProjects = () => {
         </Button>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search projects..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 h-10"
+        />
+      </div>
+
       {/* Projects Table */}
       <div className="bg-card rounded-2xl shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Project</th>
-                <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Category</th>
-                <th className="text-center py-4 px-6 text-sm font-medium text-muted-foreground">Stats</th>
-                <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((project, index) => {
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-accent" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Project</th>
+                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Category</th>
+                  <th className="text-center py-4 px-6 text-sm font-medium text-muted-foreground">Stats</th>
+                  <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentProjects.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="py-8 text-center text-muted-foreground">
+                      {searchQuery ? 'No projects found matching your search' : 'No projects yet'}
+                    </td>
+                  </tr>
+                ) : (
+                  currentProjects.map((project, index) => {
             const category = categories.find(c => String(c.id) === String(project.categoryId));
             return (<motion.tr key={project.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className="border-b border-border last:border-0">
                     <td className="py-4 px-6">
@@ -451,10 +504,52 @@ const AdminProjects = () => {
                       </div>
                     </td>
                   </motion.tr>);
-        })}
-            </tbody>
-          </table>
-        </div>
+          })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!isLoading && filteredProjects.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredProjects.length)} of {filteredProjects.length} projects
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={currentPage === page ? "accent-gradient text-accent-foreground" : ""}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}
@@ -579,7 +674,8 @@ const AdminProjects = () => {
                   </div>
                 </div>
                 <Button type="submit" className="w-full accent-gradient text-accent-foreground" disabled={isSubmitting}>
-                  {editingProject ? 'Update Project' : 'Create Project'}
+                  {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {isSubmitting ? 'Saving...' : (editingProject ? 'Update Project' : 'Create Project')}
                 </Button>
               </form>
             </motion.div>
