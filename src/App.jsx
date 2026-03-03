@@ -44,7 +44,7 @@ const App = () => (<QueryClientProvider client={queryClient}>
               },
             }}
           />
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <BrowserRouter  basename="/portfolio" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Index />}/>
