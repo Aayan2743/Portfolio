@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL:"http://192.168.1.3:8000/api/",
+  // baseURL:"",
+  baseURL:"https://api-portfolio.easybizcart.com/public/api/",
   timeout: 10000,
 });
 apiClient.interceptors.request.use(
