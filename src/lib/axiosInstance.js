@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL:"http://192.168.1.5:8000/api/",
+  baseURL:"http://192.168.1.3:8000/api/",
   timeout: 10000,
 });
 apiClient.interceptors.request.use(

@@ -1,16 +1,59 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePortfolio } from '@/contexts/PortfolioContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { isUserAuthenticated } from '@/lib/userAuth';
+import apiClient from '@/lib/axiosInstance';
 import ProjectCard from './ProjectCard';
 import InteractionModal from './InteractionModal';
+
 const ProjectsSection = () => {
-    const { projects, categories, isProjectsLoading, projectsError } = usePortfolio();
     const navigate = useNavigate();
+    const [projects, setProjects] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [isProjectsLoading, setIsProjectsLoading] = useState(true);
+    const [projectsError, setProjectsError] = useState(null);
     const [activeCategorySlug, setActiveCategorySlug] = useState(null);
     const [modalState, setModalState] = useState({ isOpen: false, type: 'interested', projectId: '', redirectPath: null });
+    const [likedProjects, setLikedProjects] = useState(new Set());
+    const [interestedProjects, setInterestedProjects] = useState(new Set());
+
+    // Fetch projects from API
+    useEffect(() => {
+        const fetchProjects = async () => {
+            try {
+                setIsProjectsLoading(true);
+                setProjectsError(null);
+                const response = await apiClient.get('public/projects');
+                
+                if (response.data.status && response.data.data) {
+                    const projectsData = response.data.data.data || [];
+                    setProjects(projectsData);
+                    
+                    // Extract unique categories
+                    const uniqueCategories = [];
+                    const categoryMap = new Map();
+                    
+                    projectsData.forEach(project => {
+                        if (project.category && !categoryMap.has(project.category.id)) {
+                            categoryMap.set(project.category.id, project.category);
+                            uniqueCategories.push(project.category);
+                        }
+                    });
+                    
+                    setCategories(uniqueCategories);
+                }
+            } catch (error) {
+                console.error('Error fetching projects:', error);
+                setProjectsError('Failed to load projects. Please try again later.');
+                toast.error('Failed to load projects');
+            } finally {
+                setIsProjectsLoading(false);
+            }
+        };
+
+        fetchProjects();
+    }, []);
     
     // Find category by slug to get its ID for filtering
     const activeCategory = activeCategorySlug 
@@ -18,21 +61,93 @@ const ProjectsSection = () => {
         : null;
     
     const filteredProjects = activeCategory
-        ? projects.filter(p => String(p.categoryId) === String(activeCategory.id))
+        ? projects.filter(p => String(p.category_id) === String(activeCategory.id))
         : projects;
+    
+    const handleLike = async (projectId) => {
+        if (!isUserAuthenticated()) {
+            toast.error('Please log in to like projects');
+            return;
+        }
+
+        try {
+            const response = await apiClient.post(`user-dashboard/projects/${projectId}/like`);
+            
+            if (response.data.success) {
+                setLikedProjects(prev => {
+                    const newSet = new Set(prev);
+                    if (response.data.liked) {
+                        newSet.add(projectId);
+                    } else {
+                        newSet.delete(projectId);
+                    }
+                    return newSet;
+                });
+                
+                toast.success(response.data.liked ? 'Added to likes!' : 'Removed from likes');
+                
+                // Update project likes count
+                setProjects(prev => prev.map(p => 
+                    p.id === projectId 
+                        ? { ...p, likes_count: response.data.liked ? p.likes_count + 1 : p.likes_count - 1 }
+                        : p
+                ));
+            }
+        } catch (error) {
+            console.error('Error liking project:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to like project';
+            toast.error(errorMessage);
+        }
+    };
+
+    const handleInterested = async (projectId) => {
+        if (!isUserAuthenticated()) {
+            setModalState({
+                isOpen: true,
+                type: 'interested',
+                projectId,
+                redirectPath: null,
+            });
+            return;
+        }
+
+        try {
+            const response = await apiClient.post(`user-dashboard/projects/${projectId}/interested`);
+            
+            if (response.data.success) {
+                setInterestedProjects(prev => {
+                    const newSet = new Set(prev);
+                    if (response.data.interested) {
+                        newSet.add(projectId);
+                    } else {
+                        newSet.delete(projectId);
+                    }
+                    return newSet;
+                });
+                
+                toast.success(response.data.interested ? 'Marked as interested!' : 'Removed from interested');
+                
+                // Update project interested count
+                setProjects(prev => prev.map(p => 
+                    p.id === projectId 
+                        ? { ...p, interested_count: response.data.interested ? p.interested_count + 1 : p.interested_count - 1 }
+                        : p
+                ));
+            }
+        } catch (error) {
+            console.error('Error marking interested:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to mark as interested';
+            toast.error(errorMessage);
+        }
+    };
     
     const openModal = (projectId, type) => {
         // If user is already authenticated, skip modal and redirect directly
         if (isUserAuthenticated()) {
             if (type === 'visit') {
                 navigate(`/project/${projectId}`);
-            } else {
-                // For interested and documented, still show success message
-                toast.success(
-                    type === 'interested' 
-                        ? 'Thank you for your interest!' 
-                        : 'Document request submitted!'
-                );
+            } else if (type === 'interested') {
+                handleInterested(projectId);
             }
             return;
         }
@@ -102,7 +217,15 @@ const ProjectsSection = () => {
                 </p>
               </motion.div>
             ) : filteredProjects.map((project, index) => (<motion.div key={project.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.4 }}>
-                <ProjectCard project={project} index={index} onVisit={() => openModal(project.id, 'visit')} onInterested={() => openModal(project.id, 'interested')} onDocument={() => openModal(project.id, 'documented')}/>
+                <ProjectCard 
+                  project={project} 
+                  index={index} 
+                  onVisit={() => openModal(project.id, 'visit')} 
+                  onInterested={() => handleInterested(project.id)}
+                  onLike={() => handleLike(project.id)}
+                  isLiked={likedProjects.has(project.id)}
+                  isInterested={interestedProjects.has(project.id)}
+                />
               </motion.div>))}
           </AnimatePresence>
         </motion.div>
